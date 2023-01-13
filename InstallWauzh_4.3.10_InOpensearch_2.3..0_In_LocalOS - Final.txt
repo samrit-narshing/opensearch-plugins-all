@@ -1,0 +1,118 @@
+Step 1 : Install some prerequistic commands
+$ apt-get install apt-transport-https zip unzip lsb-release curl gnupg
+
+Step 2 : Download "opensearch 2.3.0 version" and "Opensearch Dashboard 2.3.0" and extract it.
+$ tar -zxf opensearch-2.3.0-linux-x64.tar.gz 
+$ tar -zxf opensearch-dashboards-2.3.0-linux-x64.tar.gz 
+
+Step 3 : Add this line at the end of opesearch.yml file
+
+### Option to allow Filebeat-oss 7.10.2 to work ###
+compatibility.override_main_response_version: true
+
+
+Step 4 : Start Opensearrch 
+$ ./<Opensearch_2.3.0 Path>/opensearch-tar-install.sh
+
+
+Step 5 : Installing Wazuh Server 
+Go To Rool Priveleges "su"
+apt-get install gnupg apt-transport-https
+curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
+echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" | tee -a /etc/apt/sources.list.d/wazuh.list
+apt-get update
+
+
+
+Step 6 : Installing the Wazuh manager
+apt-get -y install wazuh-manager
+systemctl daemon-reload
+systemctl enable wazuh-manager
+systemctl start wazuh-manager
+systemctl status wazuh-manager
+
+
+
+
+Step 7: Installing Filebeat
+apt-get -y install filebeat
+curl -so /etc/filebeat/filebeat.yml https://packages.wazuh.com/4.3/tpl/wazuh/filebeat/filebeat.yml
+filebeat keystore create
+echo admin | filebeat keystore add username --stdin --force
+echo admin | filebeat keystore add password --stdin --force
+curl -so /etc/filebeat/wazuh-template.json https://raw.githubusercontent.com/wazuh/wazuh/4.3/extensions/elasticsearch/7.x/wazuh-template.json
+chmod go+r /etc/filebeat/wazuh-template.json
+curl -s https://packages.wazuh.com/4.x/filebeat/wazuh-filebeat-0.2.tar.gz | tar -xvz -C /usr/share/filebeat/module
+
+
+
+
+
+
+
+
+
+
+
+Step 8: Edit the file /etc/filebeat/filebeat.yml and add the following line: (I disable the certificate check)
+# Wazuh - Filebeat configuration file ******* START OF FILE  **************
+output.elasticsearch:
+  hosts: ["127.0.0.1:9200"]
+  protocol: https
+  username: ${username}
+  password: ${password}
+#  ssl.certificate_authorities:
+#    - /etc/filebeat/certs/root-ca.pem
+#  ssl.certificate: "/etc/filebeat/certs/filebeat.pem"
+#  ssl.key: "/etc/filebeat/certs/filebeat-key.pem"
+  ssl.verification_mode: none
+
+setup.template.json.enabled: true
+setup.template.json.path: '/etc/filebeat/wazuh-template.json'
+setup.template.json.name: 'wazuh'
+setup.ilm.overwrite: true
+setup.ilm.enabled: false
+
+filebeat.modules:
+  - module: wazuh
+    alerts:
+      enabled: true
+    archives:
+      enabled: false
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+
+#******************** END OF FILE ********************
+
+
+Step 9 : Restart filebeat
+$ systemctl daemon-reload
+$ systemctl enable filebeat
+$ systemctl start filebeat
+
+Step 10 : Test filebeat connection
+curl -u <user>:<password> -k -X GET "https://localhost:55000/security/user/authenticate?raw=true"
+curl -u wazuh:wazuh -k -X GET "https://127.0.0.1:55000/security/user/authenticate?raw=true"
+filebeat test output
+
+
+
+Step 11 : Stop Opensearch dashboard application
+
+Step 12 : Install Wazuh PLugins :
+A) Go to Openseardch dashboard folder /../../Opensearch-dashboard/ and then run below command to install wazuh plugin
+
+	Install Wazuh Version 4.3.10 For Opensearch 2.4.1
+	./bin/opensearch-dashboards-plugin install https://gitlab.com/samrit.narshing/openseach-apps/-/raw/main/wazuh-apps/wazuh-2.3.0-B.zip
+
+
+Step 13 : Start Opensearrch and Opensearch Dashboard 
+$ ./<Opensearch_Dashboard Path>/bin/opensearch-dashboards
+
